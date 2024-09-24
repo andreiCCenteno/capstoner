@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Comparison Game</title>
+    <link rel="stylesheet" href="./game.css">
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background: radial-gradient(circle, #000428, #004e92);
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 20px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+            animation: pulse 2s infinite;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 2.8em;
+            margin-bottom: 20px;
+            color: #0ff;
+            text-shadow: 0 0 15px rgba(0, 255, 255, 0.9);
+        }
+
+        .image-container {
+            display: flex; 
+            justify-content: center;
+            gap: 20px; 
+            margin-bottom: 20px;
+        }
+
+        .image-wrapper {
+            position: relative;
+        }
+
+        #targetImage {
+            max-width: 30%;
+            height: auto;
+            border: 4px solid #0ff;
+            border-radius: 15px;
+            transition: transform 0.5s ease;
+        }
+
+        .option {
+            width: 100px;
+            height: auto;
+            cursor: pointer;
+            border: 4px solid transparent;
+            border-radius: 15px;
+            transition: border-color 0.3s ease, transform 0.3s ease;
+        }
+
+        .option:hover {
+            border-color: #0ff;
+            transform: scale(1.1);
+        }
+
+        .button {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #0ff, #00f);
+            color: #fff;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 6px 12px rgba(0, 255, 255, 0.5);
+            transition: background 0.3s ease, transform 0.3s ease;
+            margin: 10px;
+        }
+
+        .button:hover {
+            background: linear-gradient(135deg, #00f, #0ff);
+            transform: scale(1.05);
+        }
+
+        #countdownContainer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+        }
+
+        #countdownText {
+            font-size: 3em;
+            color: #fff;
+            text-align: center;
+        }
+
+        #timer {
+            font-size: 1.5em;
+            margin-top: 20px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1001;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0, 0, 0);
+            background-color: rgba(0, 0, 0, 0.4);
+            padding-top: 60px;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            color: #000;
+            text-align: center;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: red;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Image Comparison Game</h1>
+        <div id="timer">Time: 0s</div>
+        
+        <div id="countdownContainer" style="display: none;">
+            <div id="countdownText"></div>
+        </div>
+
+        <div id="target-container" class="image-container">
+            <img id="targetImage" src="images/target_outline.jpg" alt="Target Image">
+        </div>
+
+        <div id="pixelationOptions" class="stage-options" style="display: block;">
+            <h2>Adjust Pixelation</h2>
+            <input type="range" id="pixelationSlider" class="slider" min="0" max="20" value="5">
+            <button class="button" id="submitPixelationButton">Submit Pixelation</button>
+        </div>
+
+        <div id="outlineOptions" class="stage-options" style="display: none;">
+            <h2>Choose the Outline</h2>
+            <div class="image-container">
+                <div class="image-wrapper">
+                    <img class="option" src="images/question.jpg" alt="Question Mark" data-label="outline1" />
+                </div>
+                <div class="image-wrapper">
+                    <img class="option" src="images/question.jpg" alt="Question Mark" data-label="outline2" />
+                </div>
+                <div class="image-wrapper">
+                    <img class="option" src="images/question.jpg" alt="Question Mark" data-label="outline3" />
+                </div>
+            </div>
+            <button class="button" id="submitOutlineButton">Submit Outline</button>
+        </div>
+
+        <div id="patternOptions" class="stage-options" style="display: none;">
+            <h2>Choose the Pattern</h2>
+            <div class="image-container">
+                <img class="option" src="images/pattern1.jpg" alt="Pattern 1" />
+                <img class="option" src="images/pattern2.jpg" alt="Pattern 2" />
+                <img class="option" src="images/pattern3.jpg" alt="Pattern 3" />
+            </div>
+            <button class="button" id="submitPattern">Submit Pattern</button>
+        </div>
+
+        <div id="colorOptions" class="stage-options" style="display: none;">
+            <h2>Choose the Color</h2>
+            <div class="image-container">
+                <p>R</p>
+                <input type="range" class="slider" id="rSlider" min="0" max="255" value="127">
+                <p>G</p>
+                <input type="range" class="slider" id="gSlider" min="0" max="255" value="127">
+                <p>B</p>
+                <input type="range" class="slider" id="bSlider" min="0" max="255" value="127">
+            </div>
+            <button class="button" id="submitColorButton">Submit Color</button>
+        </div>
+
+        <div id="resultModal" class="modal">
+            <div class="modal-content">
+                <span id="closeModal" class="close">&times;</span>
+                <p id="resultMessage"></p>
+                <button class="button" id="playAgainButton">Play Again</button>
+                <button class="button" id="quitButton">Quit Game</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedOutline, selectedPattern, selectedColor;
+        let timerInterval = null; // Initialize to null at the top level
+        let elapsedTime = 0; // Variable to track elapsed time
+        let mobilenetModel;
+        let correctAnswers = 0; // Counter for correct answers
+        const correctOutline = "outline1"; // Assuming this is the correct answer for outline
+        const correctPattern = "Pattern 1"; // Assuming this is the correct answer for pattern
+    
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Load MobileNet model
+            mobilenetModel = await mobilenet.load();
+            console.log("MobileNet model loaded!");
+    
+            showCountdown(3);
+    
+            document.getElementById('submitPixelationButton').addEventListener('click', submitPixelation);
+            document.getElementById('submitOutlineButton').addEventListener('click', submitOutline);
+            document.getElementById('submitPattern').addEventListener('click', submitPattern);
+            document.getElementById('submitColorButton').addEventListener('click', submitColor);
+            document.getElementById('closeModal').addEventListener('click', closeModal);
+            document.getElementById('playAgainButton').addEventListener('click', playAgain);
+            document.getElementById('quitButton').addEventListener('click', quitGame);
+        });
+
+        function showCountdown(seconds) {
+            const countdownContainer = document.getElementById('countdownContainer');
+            const countdownText = document.getElementById('countdownText');
+            countdownContainer.style.display = 'flex';
+    
+            let timeLeft = seconds;
+            countdownText.innerText = timeLeft;
+    
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                countdownText.innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    countdownContainer.style.display = 'none';
+                    startGame();
+                }
+            }, 1000);
+        }
+
+        function startGame() {
+            // Start the game logic
+            document.getElementById('pixelationOptions').style.display = 'block';
+            startTimer();
+        }
+
+        function startTimer() {
+            elapsedTime = 0;
+            timerInterval = setInterval(() => {
+                elapsedTime++;
+                document.getElementById('timer').innerText = `Time: ${elapsedTime}s`;
+            }, 1000);
+        }
+
+        function submitPixelation() {
+            const pixelationValue = document.getElementById('pixelationSlider').value;
+            console.log("Pixelation submitted:", pixelationValue);
+            // Add your pixelation logic here
+            document.getElementById('pixelationOptions').style.display = 'none';
+            document.getElementById('outlineOptions').style.display = 'block';
+        }
+
+        function submitOutline() {
+            const outlineOptions = document.querySelectorAll('.option');
+            
+            // Show images for 3 seconds before flipping
+            outlineOptions.forEach(option => {
+                option.src = option.src.replace('question.jpg', 'images/outline.jpg'); // Show the outline image
+            });
+
+            // Flip to question mark after 3 seconds
+            setTimeout(() => {
+                outlineOptions.forEach(option => {
+                    option.src = 'images/question.jpg'; // Flip to question mark image
+                });
+
+                // Shuffle the options
+                shuffleOptions(outlineOptions);
+
+                // Move to the next stage after shuffling
+                showStage('patternOptions');
+            }, 3000); // 3000 milliseconds = 3 seconds
+        }
+
+        function shuffleOptions(options) {
+            const parent = options[0].parentNode;
+            const shuffled = Array.from(options).sort(() => Math.random() - 0.5);
+            shuffled.forEach(option => parent.appendChild(option)); // Append in new order
+        }
+
+        function showStage(stage) {
+            document.querySelectorAll('.stage-options').forEach((el) => {
+                el.style.display = 'none';
+            });
+            document.getElementById(stage).style.display = 'block';
+        }
+
+        function submitPattern() {
+            selectedPattern = document.querySelector('.pattern.selected');
+            if (selectedPattern) {
+                console.log("Pattern submitted:", selectedPattern.src);
+                showStage('colorOptions');
+            } else {
+                alert("Please select a pattern.");
+            }
+        }
+
+        function submitColor() {
+            const rValue = document.getElementById('rSlider').value;
+            const gValue = document.getElementById('gSlider').value;
+            const bValue = document.getElementById('bSlider').value;
+            console.log("Color submitted:", `R: ${rValue}, G: ${gValue}, B: ${bValue}`);
+            showResult();
+        }
+
+        function showResult() {
+            clearInterval(timerInterval);
+            let resultMessage = `You got ${correctAnswers} correct answers! Time taken: ${elapsedTime}s`;
+            document.getElementById('resultMessage').innerText = resultMessage;
+            document.getElementById('resultModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('resultModal').style.display = 'none';
+        }
+
+        function playAgain() {
+            closeModal();
+            // Reset game state
+            showCountdown(3);
+        }
+
+        function quitGame() {
+            window.location.href = "mainmenu.php"; // Redirect to main menu
+        }
+    </script>
+</body>
+</html>
